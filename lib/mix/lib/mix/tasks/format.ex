@@ -66,6 +66,10 @@ defmodule Mix.Tasks.Format do
       Defaults to `.formatter.exs` if one is available. See the
       "Formatting options" section above for more information.
 
+    * `--cwd` - path to use as the current working directory for formatting,
+      when this is passed it will be as if you ran the task from the directory
+      that was passed.
+
   ## When to format code
 
   We recommend developers to format code directly in their editors, either
@@ -165,6 +169,7 @@ defmodule Mix.Tasks.Format do
   @switches [
     check_equivalent: :boolean,
     check_formatted: :boolean,
+    cwd: :string,
     dot_formatter: :string,
     dry_run: :boolean
   ]
@@ -211,7 +216,7 @@ defmodule Mix.Tasks.Format do
 
   The function must be called with the contents of the file
   to be formatted. The options are returned for reflection
-  purposes.
+  purposes and to enable formatting of code snippets.
   """
   @doc since: "1.13.0"
   def formatter_for_file(file, opts \\ []) do
@@ -234,15 +239,14 @@ defmodule Mix.Tasks.Format do
   end
 
   defp eval_dot_formatter(opts) do
-    cond do
-      dot_formatter = opts[:dot_formatter] ->
-        {dot_formatter, eval_file_with_keyword_list(dot_formatter)}
+    cwd = Keyword.get(opts, :cwd, File.cwd!())
+    # TODO: I'd prefer to call this "dot_formatter_path"
+    dot_formatter = Path.expand(opts[:dot_formatter] || ".formatter.exs", cwd)
 
-      File.regular?(".formatter.exs") ->
-        {".formatter.exs", eval_file_with_keyword_list(".formatter.exs")}
-
-      true ->
-        {".formatter.exs", []}
+    if File.regular?(dot_formatter) do
+      {dot_formatter, eval_file_with_keyword_list(dot_formatter)}
+    else
+      {dot_formatter, []}
     end
   end
 
@@ -311,7 +315,13 @@ defmodule Mix.Tasks.Format do
   end
 
   defp maybe_cache_in_manifest(dot_formatter, manifest, fun) do
+    no_project = is_nil(Mix.Project.get())
+
+    can_cache = no_project
     cond do
+      # This check might need to change since dot_formatter could now be an absolute path
+      # For ElixirLS Mix.Project.get could be a different project altogether...
+      # Although it shouldn't be nil!
       is_nil(Mix.Project.get()) or dot_formatter != ".formatter.exs" -> fun.()
       entry = read_manifest(manifest) -> entry
       true -> write_manifest!(manifest, fun.())
@@ -321,6 +331,7 @@ defmodule Mix.Tasks.Format do
   defp read_manifest(manifest) do
     with {:ok, binary} <- File.read(manifest),
          {:ok, {@manifest_vsn, entry, sources}} <- safe_binary_to_term(binary),
+         # HERE
          expanded_sources = Enum.flat_map(sources, &Path.wildcard(&1, match_dot: true)),
          false <- Mix.Utils.stale?([Mix.Project.config_mtime() | expanded_sources], [manifest]) do
       {entry, sources}
@@ -414,6 +425,7 @@ defmodule Mix.Tasks.Format do
   end
 
   defp eval_file_with_keyword_list(path) do
+    # HERE (or in the place that generates this path)
     {opts, _} = Code.eval_file(path)
 
     unless Keyword.keyword?(opts) do
@@ -432,6 +444,7 @@ defmodule Mix.Tasks.Format do
     end
 
     dot_formatter
+    # HERE: Generate an appropriate prefix (instead of [])
     |> expand_dot_inputs([], formatter_opts_and_subs, %{})
     |> Enum.map(fn {file, {_dot_formatter, formatter_opts}} ->
       {file, find_formatter_for_file(file, formatter_opts)}
@@ -492,6 +505,7 @@ defmodule Mix.Tasks.Format do
     end)
   end
 
+  # HERE
   defp expand_relative_to_cwd(path) do
     case File.cwd() do
       {:ok, cwd} -> Path.expand(path, cwd)
@@ -557,6 +571,7 @@ defmodule Mix.Tasks.Format do
   end
 
   defp read_file(:stdin), do: IO.stream() |> Enum.to_list() |> IO.iodata_to_binary()
+  # Maybe here
   defp read_file(file), do: File.read!(file)
 
   defp format_file({file, formatter}, task_opts) do
@@ -584,6 +599,7 @@ defmodule Mix.Tasks.Format do
     cond do
       file == :stdin -> IO.write(output)
       input == output -> :ok
+      # Maybe here
       true -> File.write!(file, output)
     end
 
@@ -624,6 +640,7 @@ defmodule Mix.Tasks.Format do
   end
 
   defp to_bullet_list(files) do
+    # HERE
     Enum.map_join(files, "\n", &"  * #{&1 |> to_string() |> Path.relative_to_cwd()}")
   end
 end
