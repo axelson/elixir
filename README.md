@@ -1,3 +1,6 @@
+1. Accept cwd as an option (which defaults to File.cwd)
+2. Make sure that all the path lookups what we do have a Path.join(cwd, path)
+
 <img src="https://github.com/elixir-lang/elixir-lang.github.com/raw/main/images/logo/logo.png" width="200" alt="Elixir">
 
 [![CI](https://github.com/elixir-lang/elixir/workflows/CI/badge.svg?branch=main)](https://github.com/elixir-lang/elixir/actions?query=branch%3Amain+workflow%3ACI) [![Build status](https://api.cirrus-ci.com/github/elixir-lang/elixir.svg?branch=main)](https://cirrus-ci.com/github/elixir-lang/elixir)
